@@ -187,20 +187,30 @@ function createElementsWithEventListeners(interpreter: Interpreter, pyAttribute:
             el.addEventListener(eventName, (evt) => {
                 try {
                     const pyEval = interpreter.globals.get('eval')
-                    const pythonFunction = pyEval(userProvidedFunctionName, interpreter.globals)
-                    const pyInspectModule = interpreter.interface.pyimport('inspect')
-                    const params = pyInspectModule.signature(pythonFunction).parameters
+                    const pyCallable = interpreter.globals.get('callable')
+                    const pyDictClass = interpreter.globals.get('dict')
 
-                    // Functions that don't receive an event attribute
+                    const localsDict = pyDictClass()
+                    localsDict.set('event', evt)
+
+                    const evalResult = pyEval(userProvidedFunctionName, interpreter.globals, localsDict)
+                    const isCallable = pyCallable(evalResult)
+                    
+                    if (isCallable) {
+                        const pyInspectModule = interpreter.interface.pyimport('inspect')
+                        const params = pyInspectModule.signature(evalResult).parameters
+                   
+
                     if (params.length == 0) {
-                        pythonFunction();
+                        evalResult();
                     }
                     // Functions that receive an event attribute
                     else if (params.length == 1) {
-                        pythonFunction(evt);
+                        evalResult(evt);
                     }
                     else {
                         throw new UserError(ErrorCode.GENERIC, "py-events take 0 or 1 arguments")
+                        }
                     }
                 }
 
