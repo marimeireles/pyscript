@@ -214,6 +214,7 @@ def when(event=None, id=None):
     def decorator(func):
         element = js.document.getElementById(id)
         sig = inspect.signature(func)
+        print(event, '🙈 should receive an event')
 
         # Function doesn't receive events
         if not sig.parameters:
@@ -223,6 +224,7 @@ def when(event=None, id=None):
 
             add_event_listener(element, event, wrapper)
         else:
+            print('🐍')
             add_event_listener(element, event, func)
 
     return decorator
