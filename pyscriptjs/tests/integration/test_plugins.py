@@ -208,8 +208,6 @@ class TestPlugin(PyScriptTest):
             assert f"{method} called" not in log_lines
 
         # TODO: It'd be actually better to check that the events get called in order
-    import pytest
-    @pytest.mark.xfail(reason="MARIANA")
     @prepare_test(
         "exec_test_logger",
         EXEC_HOOKS_PLUGIN_CODE,
