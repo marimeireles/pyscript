@@ -17,35 +17,31 @@ export function make_PyScript(interpreter: Interpreter, app: PyScriptApp) {
         stderr_manager: Stdio | null;
 
         async connectedCallback() {
-            ensureUniqueId(this);
-            // Save innerHTML information in srcCode so we can access it later
-            // once we clean innerHTML (which is required since we don't want
-            // source code to be rendered on the screen)
-            this.srcCode = this.innerHTML;
-            const pySrc = await this.getPySrc();
-            this.innerHTML = '';
+            /**
+             * Since connectedCallback is async, multiple py-script tags can be executed in
+             * an order which is not particularly sequential. The locking mechanism here ensures
+             * a sequential execution of multiple py-script tags present in one page.
+             *
+             * Concurrent access to the multiple py-script tags is thus avoided.
+             */
+            let releaseLock: any;
+            try {
+                releaseLock = await app.tagExecutionLock();
+                ensureUniqueId(this);
+                // Save innerHTML information in srcCode so we can access it later
+                // once we clean innerHTML (which is required since we don't want
+                // source code to be rendered on the screen)
+                this.srcCode = this.innerHTML;
+                const pySrc = await this.getPySrc();
+                this.innerHTML = '';
 
-            app.plugins.beforePyScriptExec({interpreter: interpreter, src: pySrc, pyScriptTag: this});
-            const result = pyExec(interpreter, pySrc, this);
-            app.plugins.afterPyScriptExec({interpreter: interpreter, src: pySrc, pyScriptTag: this, result: result});
-        }
-
-        async getPySrc(): Promise<string> {
-            if (this.hasAttribute('src')) {
-                const url = this.getAttribute('src');
-                try {
-                    const response = await robustFetch(url);
-                    return await response.text();
-                } catch (e) {
-                    _createAlertBanner(e.message);
-                    this.innerHTML = '';
-                    throw e;
-                }
-            } else {
-                return htmlDecode(this.srcCode);
+                app.plugins.beforePyScriptExec({interpreter: interpreter, src: pySrc, pyScriptTag: this});
+                const result = (await pyExec(interpreter, pySrc, this)).result;
+                app.plugins.afterPyScriptExec({interpreter: interpreter, src: pySrc, pyScriptTag: this, result: result});
+            } finally {
+                releaseLock()
             }
         }
-    }
 
     return PyScript;
 }
