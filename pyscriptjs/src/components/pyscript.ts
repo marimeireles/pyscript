@@ -84,41 +84,60 @@ function createElementsWithEventListeners(interpreter: Interpreter, browserEvent
         const pyEvent = 'py-' + browserEvent;
         const userProvidedFunctionName = el.getAttribute(pyEvent);
 
-        el.addEventListener(browserEvent, (evt) => {
+        // TODO: this if statement is deprecated and should be removed on the 2nd version after 2022.12.1
+        const possibleDeprecatedPysEvent = 'pys-' + browserEvent;
+        if (possibleDeprecatedPysEvent === 'pys-onClick' || possibleDeprecatedPysEvent === 'pys-onKeyDown') {
+            const msg =
+                `The attribute 'pys-onClick' and 'pys-onKeyDown' are deprecated. Please 'py-click="myFunction()"' ` +
+                ` or 'py-keydown="myFunction()"' instead.`;
+            createDeprecationWarning(msg, msg);
+            const source = `
+            from pyodide.ffi import create_proxy
+            Element("${el.id}").element.addEventListener("${browserEvent}",  create_proxy(${userProvidedFunctionName}))
+            `;
+            // We meed to run the source code in a try/catch block, because
+            // the source code may contain a syntax error, which will cause
+            // the splashscreen to not be removed.
             try {
-                const pyEval = interpreter.globals.get('eval')
-                const pyCallable = interpreter.globals.get('callable')
-                const pyDictClass = interpreter.globals.get('dict')
+                interpreter.run(source);
+            } catch (e) {
+                logger.error((e as Error).message);
+            }
+        } else {
+            el.addEventListener(browserEvent, (evt) => {
+                try {
+                    const pyEval = interpreter.globals.get('eval')
+                    const pyCallable = interpreter.globals.get('callable')
+                    const pyDictClass = interpreter.globals.get('dict')
 
-                const localsDict = pyDictClass()
-                localsDict.set('event', evt)
+                    const localsDict = pyDictClass()
+                    localsDict.set('event', evt)
 
-                const evalResult = pyEval(userProvidedFunctionName, interpreter.globals, localsDict)
-                const isCallable = pyCallable(evalResult)
-                
-                if (isCallable) {
-                    const pyInspectModule = interpreter.interface.pyimport('inspect')
-                    const params = pyInspectModule.signature(evalResult).parameters
-                    console.log('params 🔥', params)
-                    if (params.length == 0) {
-                        evalResult();
-                    }
-                    // Functions that receive an event attribute
-                    else if (params.length == 1) {
-                        evalResult(evt);
-                    }
-                else {
-                    throw new UserError(ErrorCode.GENERIC, "py-events take 0 or 1 arguments")
+                    const evalResult = pyEval(userProvidedFunctionName, interpreter.globals, localsDict)
+                    const isCallable = pyCallable(evalResult)
+                    
+                    if (isCallable) {
+                        const pyInspectModule = interpreter.interface.pyimport('inspect')
+                        const params = pyInspectModule.signature(evalResult).parameters
+                        if (params.length == 0) {
+                            evalResult();
+                        }
+                        // Functions that receive an event attribute
+                        else if (params.length == 1) {
+                            evalResult(evt);
+                        }
+                    else {
+                        throw new UserError(ErrorCode.GENERIC, "py-events take 0 or 1 arguments")
+                        }
                     }
                 }
-            }
 
-            catch (err) {
-                // TODO: This should be an error - probably need to refactor
-                // this function into createSingularBanner
-                createSingularWarning(err);
-            }
-        });
+                catch (err) {
+                    // TODO: This should be an error - probably need to refactor
+                    // this function into createSingularBanner
+                    createSingularWarning(err);
+                }
+            });
     }
     // }
     // TODO: Should we actually map handlers in JS instead of Python?
