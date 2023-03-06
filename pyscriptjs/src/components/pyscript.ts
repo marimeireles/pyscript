@@ -138,6 +138,7 @@ function createElementsWithEventListeners(interpreter: Interpreter, browserEvent
                     createSingularWarning(err);
                 }
             });
+        }
     }
     // }
     // TODO: Should we actually map handlers in JS instead of Python?
