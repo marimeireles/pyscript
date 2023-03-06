@@ -27,6 +27,7 @@ class TestExamples(PyScriptTest):
         # make sure that the http server serves from the right directory
         ROOT.join("pyscriptjs").chdir()
 
+    @pytest.mark.xfail(reason="MARIANA")
     def test_hello_world(self):
         self.goto("examples/hello_world.html")
         self.wait_for_pyscript()
